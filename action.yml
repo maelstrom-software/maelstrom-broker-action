@@ -1,0 +1,51 @@
+name: 'Maelstrom Broker'
+description: 'Run and install Maelstrom broker'
+branding:
+  icon: check-circle
+  color: blue
+runs:
+  using: "composite"
+  steps:
+    # This is required to get some variables that Maelstrom needs to use the
+    # artifact store.
+  - name: Expose GitHub Action Variables
+    uses: crazy-max/ghaction-github-runtime@v3
+
+    # This installs the latest broker image from GitHub.
+  - name: Install Maelstrom Broker
+    uses: jaxxstorm/action-install-gh-release@master
+    with:
+      repo: maelstrom-software/maelstrom
+      asset-name: maelstrom-broker
+
+  # This starts the broker in the background, and captures the port it's
+  # listening on. As a side-effect, it also creates a lof file for the
+  # broker's stderr.
+  - name: Start Maelstrom Broker
+    run: |
+      TEMPFILE=$(mktemp maelstrom-broker-stderr.XXXXXX)
+      maelstrom-broker 2> >(tee "$TEMPFILE" >&2) &
+      PID=$!
+      PORT=$( \
+        tail -f "$TEMPFILE" \
+        | awk '/\<addr: / { print $0; exit}' \
+        | sed -Ee 's/^.*\baddr: [^,]*:([0-9]+),.*$/\1/' \
+      )
+      echo "MAELSTROM_BROKER_PID=$PID" >> "$GITHUB_ENV"
+      echo "CARGO_MAELSTROM_BROKER=localhost:$PORT" >> "$GITHUB_ENV"
+      echo "CARGO_MAELSTROM_ARTIFACT_TRANSFER_STRATEGY=github" >> "$GITHUB_ENV"
+      echo "MAELSTROM_PYTEST_BROKER=localhost:$PORT" >> "$GITHUB_ENV"
+      echo "MAELSTROM_PYTEST_ARTIFACT_TRANSFER_STRATEGY=github" >> "$GITHUB_ENV"
+      echo "MAELSTROM_GO_TEST_BROKER=localhost:$PORT" >> "$GITHUB_ENV"
+      echo "MAELSTROM_GO_TEST_ARTIFACT_TRANSFER_STRATEGY=github" >> "$GITHUB_ENV"
+      echo "MAELSTROM_RUN_BROKER=localhost:$PORT" >> "$GITHUB_ENV"
+      echo "MAELSTROM_RUN_ARTIFACT_TRANSFER_STRATEGY=github" >> "$GITHUB_ENV"
+    env:
+      MAELSTROM_BROKER_ARTIFACT_TRANSFER_STRATEGY: github
+
+  # This sets up a post-job handler to kill the broker. Shutting the broker
+  # down cleanly will tell the workers to terminate.
+  - name: Schedule Post Handler to Kill Maelstrom Broker
+    uses: gacts/run-and-post-run@v1
+    with:
+      post: kill -15 $MAELSTROM_BROKER_PID
