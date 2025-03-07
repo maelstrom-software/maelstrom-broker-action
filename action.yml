@@ -24,8 +24,9 @@ runs:
   - name: Start Maelstrom Broker
     run: |
       TEMPFILE=$(mktemp maelstrom-broker-stderr.XXXXXX)
-      maelstrom-broker 2> >(tee "$TEMPFILE" >&2) & disown
+      maelstrom-broker 2> >"$TEMPFILE" &
       PID=$!
+      disown $!
       PORT=$( \
         tail -f "$TEMPFILE" \
         | awk '/\<addr: / { print $0; exit}' \
