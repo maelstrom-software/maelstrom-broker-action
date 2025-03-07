@@ -40,6 +40,7 @@ runs:
       echo "MAELSTROM_GO_TEST_ARTIFACT_TRANSFER_STRATEGY=github" >> "$GITHUB_ENV"
       echo "MAELSTROM_RUN_BROKER=localhost:$PORT" >> "$GITHUB_ENV"
       echo "MAELSTROM_RUN_ARTIFACT_TRANSFER_STRATEGY=github" >> "$GITHUB_ENV"
+    shell: bash
     env:
       MAELSTROM_BROKER_ARTIFACT_TRANSFER_STRATEGY: github
 
