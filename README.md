@@ -21,8 +21,28 @@ jobs:
     runs-on: ubuntu-24.04
 
     steps:
-    - name: Install and Run Maelstrom Broker
+    - name: Install Maelstrom Broker
       uses: maelstrom-software/maelstrom-broker-action@v1
+
+    - name: Start Maelstrom Broker
+      run: |
+        TEMPFILE=$(mktemp maelstrom-broker-stderr.XXXXXX)
+        maelstrom-broker 2> >(tee "$TEMPFILE" >&2) &
+        PID=$!
+        PORT=$( \
+          tail -f "$TEMPFILE" \
+          | awk '/\<addr: / { print $0; exit}' \
+          | sed -Ee 's/^.*\baddr: [^,]*:([0-9]+),.*$/\1/' \
+        )
+        echo "MAELSTROM_BROKER_PID=$PID" >> "$GITHUB_ENV"
+        echo "MAELSTROM_BROKER_PORT=$PORT" >> "$GITHUB_ENV"
+      env:
+        MAELSTROM_BROKER_ARTIFACT_TRANSFER_STRATEGY: github
+
+    - name: Schedule Post Handler to Kill Maelstrom Broker
+      uses: gacts/run-and-post-run@v1
+      with:
+        post: kill -15 $MAELSTROM_BROKER_PID
 
     - name: Check Out Repository
       uses: actions/checkout@v4
@@ -36,20 +56,21 @@ jobs:
 
 # How to Use
 
-Run multiple Maelstrom worker jobs in parallel with Maelstrom test runners,
-like `cargo-maelstrom`, `maelstrom-go-test`, or `maelstrom-pytest`. See [this
+Run at the beginning of a job that will use Maelstrom test runner, 
+like `cargo-maelstrom`, `maelstrom-go-test`, or `maelstrom-pytest`. Maelstrom
+workers should be run on separate jobs. See [this
 example workflow](https://github.com/maelstrom-software/maelstrom-examples/blob/main/.github/workflows/ci-base.yml).
 
 # What it Does
 
 This action installs
-[`maelstrom-worker`](https://maelstrom-software.com/doc/book/latest/worker.html),
-sets a [sysctl to allow unprivileged user
-namespaces](https://ubuntu.com/blog/ubuntu-23-10-restricted-unprivileged-user-namespaces),
-then runs `maelstrom-worker` until completion.
+[`maelstrom-broker`](https://maelstrom-software.com/doc/book/latest/broker.html),
+and exposes some environment variables needed for later actions.
 
-The worker will connect to the broker, execute tests as long as the broker
-provides them, and then exit when the broker itself exits.
+Unfortunately, because of limitations with GitHub actions, this action doesn't
+start the broker. You need to do that yourself, as shown in the example.
+Additionally, you should set a post handler to kill the broker at the end of
+the job, also show in the example.
 
 # Learn More
 
