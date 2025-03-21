@@ -13,7 +13,18 @@ runs:
 
     # This installs the latest broker image from GitHub.
   - name: Install Maelstrom Broker
-    uses: jaxxstorm/action-install-gh-release@master
+    uses: jaxxstorm/action-install-gh-release@v2
     with:
       repo: maelstrom-software/maelstrom
       asset-name: maelstrom-broker
+      tag: v0.14.0
+      cache: enable
+
+    # This runs the broker. It will exit when told to via `maelstrom-admin stop`.
+  - name: Run Maelstrom Broker
+    run: maelstrom-broker
+    shell: bash
+    env:
+      MAELSTROM_CLUSTER_COMMUNICATION_STRATEGY: github
+      MAELSTROM_GITHUB_ACTIONS_TOKEN: ${{ env.ACTIONS_RUNTIME_TOKEN }}
+      MAELSTROM_GITHUB_ACTIONS_URL: ${{ env.ACTIONS_RESULTS_URL }}
