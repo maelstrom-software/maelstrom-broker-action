@@ -8,7 +8,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ## [1.1.0] - 2025-03-21
-
 ### Changes
 - The action now runs the broker after installing it. As a result, the action
   must now be run on its own job.
@@ -18,7 +17,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Updated README.md to reflect new usage.
 
 ## [1.0.0] - 2025-03-07
-
 ### Added
 - The initial version of this action.
 
