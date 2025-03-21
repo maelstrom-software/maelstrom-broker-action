@@ -1,17 +1,17 @@
 name: 'Maelstrom Broker'
-description: 'Install Maelstrom broker and prepare it for execution'
+description: 'Run and install Maelstrom broker'
 branding:
   icon: check-circle
   color: blue
 runs:
   using: "composite"
   steps:
-    # This is required to get some variables that Maelstrom needs to use the
-    # artifact store.
+  # This is required to get some variables that Maelstrom needs to use the
+  # artifact store.
   - name: Expose GitHub Action Variables
     uses: crazy-max/ghaction-github-runtime@v3
 
-    # This installs the latest broker image from GitHub.
+  # This installs the latest broker image from GitHub.
   - name: Install Maelstrom Broker
     uses: jaxxstorm/action-install-gh-release@master
     with:
@@ -20,7 +20,8 @@ runs:
       tag: v0.14.0
       cache: enable
 
-    # This runs the broker. It will exit when told to via `maelstrom-admin stop`.
+  # This runs the broker. It will exit when told to via `maelstrom-admin stop`.
+  # That can be done using the maelstrom-admin-action.
   - name: Run Maelstrom Broker
     run: maelstrom-broker
     shell: bash
