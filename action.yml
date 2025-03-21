@@ -22,7 +22,7 @@ runs:
 
     # This runs the broker. It will exit when told to via `maelstrom-admin stop`.
   - name: Run Maelstrom Broker
-    run: maelstrom-broker
+    run: maelstrom-broker -L debug
     shell: bash
     env:
       MAELSTROM_CLUSTER_COMMUNICATION_STRATEGY: github
