@@ -20,48 +20,18 @@ jobs:
     name: Run Tests
     # Both ubuntu-22.04 and ubuntu-24.04 are supported.
     # Both x86-64 and ARM (AArch64) are supported.
-    # The architecture needs to be the same as the workers.
+    # The architecture needs to be the same as the workers (but not the broker).
     runs-on: ubuntu-24.04
 
     steps:
-      # The broker needs to be installed and started before running the
-      # cargo-maelstrom-action or the maelstrom-go-test-action. The broker must
-      # be run in the same job as the test runners (cargo-maelstrom or
-      # maelstrom-go-test).
-    - name: Install Maelstrom Broker
-      uses: maelstrom-software/maelstrom-broker-action@v1
 
-      # Start the broker as a background process in this job.
-    - name: Start Maelstrom Broker
-      run: |
-        TEMPFILE=$(mktemp maelstrom-broker-stderr.XXXXXX)
-        maelstrom-broker 2> >(tee "$TEMPFILE" >&2) &
-        PID=$!
-        PORT=$( \
-          tail -f "$TEMPFILE" \
-          | awk '/\<addr: / { print $0; exit}' \
-          | sed -Ee 's/^.*\baddr: [^,]*:([0-9]+),.*$/\1/' \
-        )
-        echo "MAELSTROM_BROKER_PID=$PID" >> "$GITHUB_ENV"
-        echo "MAELSTROM_BROKER_PORT=$PORT" >> "$GITHUB_ENV"
-      env:
-        MAELSTROM_BROKER_ARTIFACT_TRANSFER_STRATEGY: github
-
-      # Schedule a post-job handler to kill the broker. Killing the broker with
-      # signal 15 (SIGTERM) allows it to tell the workers to shut themselves
-      # down.
-    - name: Schedule Post Handler to Kill Maelstrom Broker
-      uses: gacts/run-and-post-run@v1
-      with:
-        post: kill -15 $MAELSTROM_BROKER_PID
-
-      # This action installs and configures (via environment variables)
-      # cargo-maelstrom so it can be run simply with `cargo maelstrom`.
+    # This action installs and configures (via environment variables)
+    # cargo-maelstrom so it can be run simply with `cargo maelstrom`.
     - name: Install and Configure cargo-maelstrom
       uses: maelstrom-software/cargo-maelstrom@v1
 
-      # This action installs and configures (via environment variables)
-      # maelstrom-go-test so it can be run simply with `maelstrom-go-test`.
+    # This action installs and configures (via environment variables)
+    # maelstrom-go-test so it can be run simply with `maelstrom-go-test`.
     - name: Install and Configure maelstrom-go-test
       uses: maelstrom-software/maelstrom-go-test-action@v1
 
@@ -76,42 +46,55 @@ jobs:
     - name: Run Tests
       run: maelstrom-go-test
 
+  # This is the broker job. It runs in parallel to the worker jobs and the #
+  # client jobs.
+  maelstrom-broker:
+    name: Maelstrom Broker
+    runs-on: ubuntu-24.04 # Can be ARM or AMD. It doesn't matter.
+    steps:
+    - name: Install and Run Maelstrom Broker
+      uses: maelstrom-software/maelstrom-broker-action@main
+
   # These are the worker jobs. Tests will execute on one of these workers.
   maelstrom-worker:
     strategy:
       matrix:
         worker-number: [1, 2, 3, 4]
-
     name: Maelstrom Worker ${{ matrix.worker-number }}
-
-    # This must be the same architecture as the test-running job.
-    runs-on: ubuntu-24.04
-
+    runs-on: ubuntu-24.04 # Must be the same as the test-running job(s).
     steps:
     - name: Install and Run Maelstrom Worker
       uses: maelstrom-software/maelstrom-worker-action@v1
+
+  # This job stops the cluster. It needs to depend on the test-running job(s).
+  stop-maelstrom:
+    runs-on: ubuntu-24.04 # Can be ARM or AMD. It doesn't matter.
+    if: ${{ always() }}
+    needs: [run-tests]
 ```
 
 # How to Use
 
-Run at the beginning of a job that will use Maelstrom test runner, 
-like `cargo-maelstrom`, `maelstrom-go-test`, or `maelstrom-pytest`. Maelstrom
-workers should be run on separate jobs. See [this
-example workflow](https://github.com/maelstrom-software/maelstrom-examples/blob/main/.github/workflows/ci-base.yml).
+Run on its own job in parallel with the Maelstrom workers and jobs that use
+Maelstrom test runners, like `cargo-maelstrom`, `maelstrom-go-test`, or
+`maelstrom-pytest`. Maelstrom workers should be run on separate jobs. See [this
+example
+workflow](https://github.com/maelstrom-software/maelstrom-examples/blob/main/.github/workflows/ci-base.yml).
+
+After all test-running jobs are done, use `maelstrom-admin` to stop the job.
+See
+[`maelstrom-admin-action`](https://github.com/maelstrom-software/maelstrom-admin-action).
 
 # What it Does
 
 This action installs
 [`maelstrom-broker`](https://maelstrom-software.com/doc/book/latest/broker.html),
-and exposes some environment variables needed for later actions.
+then runs it until completion, either by being sent a signal or being told to
+stop by `maelstrom-admin stop`.
 
-Unfortunately, because of limitations with GitHub actions, this action doesn't
-start the broker. You need to do that yourself, as shown in the example.
-Additionally, you should set a post handler to kill the broker at the end of
-the job, also show in the example.
-
-The test runners need to be run in the same job, after starting the broker. The
-example above illustrates this.
+Workers and test runners will connect to the broker. The broker will send
+test-runners' tests to the workers for executio, then send the results back to
+the test runners.
 
 # Learn More
 
