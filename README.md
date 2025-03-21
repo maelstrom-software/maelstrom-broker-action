@@ -53,7 +53,7 @@ jobs:
     runs-on: ubuntu-24.04 # Can be ARM or AMD. It doesn't matter.
     steps:
     - name: Install and Run Maelstrom Broker
-      uses: maelstrom-software/maelstrom-broker-action@main
+      uses: maelstrom-software/maelstrom-broker-action@v1
 
   # These are the worker jobs. Tests will execute on one of these workers.
   maelstrom-worker:
@@ -71,6 +71,11 @@ jobs:
     runs-on: ubuntu-24.04 # Can be ARM or AMD. It doesn't matter.
     if: ${{ always() }}
     needs: [run-tests]
+    steps:
+    - name: Install and Configure maelstrom-go-test
+      uses: maelstrom-software/maelstrom-admin-action@v1
+    - name: Stop Maelstrom Cluster
+      run: maelstrom-admin stop
 ```
 
 # How to Use
